@@ -1,0 +1,68 @@
+if [ -z ${VARRHOTURBPATH} ]; then
+    echo "Will build against the standard turbulence modelling library"
+
+    # Fetch interFoam
+    cp $FOAM_APP/solvers/multiphase/interFoam/interFoam.C spillwayFlow.C
+    cp -r $FOAM_APP/solvers/multiphase/VoF .
+else
+    echo "Will build against the varRhoTurbulence library"
+
+    varRhoIncludePath=${VARRHOTURBPATH}"/varRhoIncompressible/lnInclude"
+    # Fetch varRhoInterFoam
+    cp ${VARRHOTURBPATH}"/varRhoInterFoam/varRhoInterFoam.C" spillwayFlow.C
+    cp -r ${VARRHOTURBPATH}"/VoF" .
+fi
+
+# Fetch the Make/options
+cp $FOAM_APP/solvers/multiphase/interFoam/Make/options Make
+
+# Search for the line number containing createFields.H
+linenumber=$(grep -nr 'createFields.H' spillwayFlow.C | sed -n 's/^\([0-9]*\)[:].*/\1/p')
+linenumber=`expr $linenumber + 1`
+
+# Insert the additional includes
+sed -i "${linenumber}i    #include \"readModelProperties.H\"" spillwayFlow.C
+linenumber=`expr $linenumber + 1`
+sed -i "${linenumber}i    #include \"createFieldsAir.H\"" spillwayFlow.C
+
+# Search for alphaControls.H and insert source term and alphaG equation there
+linenumber=$(grep -nr 'alphaControls.H' spillwayFlow.C | sed -n 's/^\([0-9]*\)[:].*/\1/p')
+sed -i "${linenumber}i    #include \"alphagEqn.H\"" spillwayFlow.C
+
+# In alphaEqn change the compressive flux 
+linenumber=$(grep -n 'flux(-phir' VoF/alphaEqn.H | sed -n 's/^\([0-9]*\)[:].*/\1/p')
+sed -i "${linenumber}i    -fvc::flux(-phir, 1 - alpha1 - alphag, alpharScheme)," VoF/alphaEqn.H
+linenumber=`expr $linenumber + 1`
+sed -i "${linenumber}d" VoF/alphaEqn.H
+
+# In Make options search for line containing the include the VoF directory and delete it
+linenumber=$(grep -nr 'VoF' Make/options | sed -n 's/^\([0-9]*\)[:].*/\1/p')
+sed -i "${linenumber}d" Make/options
+
+# Add correct includes and libraries to Make/options
+sed -i "${linenumber}i    -I./VoF \\\\" Make/options
+
+if [ -z ${VARRHOTURBPATH} ]; then
+    # Add include of the interFoam folder, it containts pEqn.H, UEqn.H etc
+    sed -i "${linenumber}i    -I\$(FOAM_APP)/solvers/multiphase/interFoam \\\\" Make/options
+else
+    sed -i "${linenumber}i    -I${VARRHOTURBPATH}/varRhoInterFoam \\\\" Make/options
+
+    # Change tubrulence libraries to varRho
+    linenumber=$(grep -nr 'lincompressibleTurbulence' Make/options | sed -n 's/^\([0-9]*\)[:].*/\1/p')
+    sed -i "${linenumber}d" Make/options
+    sed -i "${linenumber}i    -lvarRhoIncompressibleTurbulenceModels \\\\" Make/options
+
+    # Add FOAM_USER_LIBBIN to library seach path
+    sed -i "${linenumber}i    -L\$(FOAM_USER_LIBBIN) \\\\" Make/options
+
+    # Remove include path for standard turbulence models and add path to varRho
+    linenumber=$(grep -nr 'TurbulenceModels/incompressible' Make/options | sed -n 's/^\([0-9]*\)[:].*/\1/p')
+    sed -i "${linenumber}d" Make/options
+    sed -i "${linenumber}i    -I${varRhoIncludePath} \\\\" Make/options
+fi
+
+sed -i s/interFoam/spillwayFlow/g spillwayFlow.C
+
+# Compile
+wmake

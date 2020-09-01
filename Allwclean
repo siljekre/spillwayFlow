@@ -1,0 +1,4 @@
+rm -r VoF
+rm spillwayFlow.C
+rm Make/options
+wclean
