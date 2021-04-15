@@ -280,10 +280,31 @@ Info<< "Air entrainment source: "
 scalarField & penaltySourceField = penaltySource.primitiveFieldRef();
 penaltySourceField = -neg(alpha1 - 0.1)/runTime.deltaTValue();
 
+
+// *** Solve momentum equation for Ug
+if (momentumType == "slipModel")
+{
+    #include "slipVelocity.H"
+}
+else if (momentumType == "off")
+{
+    Ug = U;
+ }
+
+// *** Print the velocity values
+Info << "Velocities: "
+<< "Min(U) = " << min(mag(U)).value()
+<< " Max(U) = " << max(mag(U)).value()
+<< " Min(Ug) = " << min(mag(Ug)).value()
+<< " Max(Ug) = " << max(mag(Ug)).value()
+<< endl;
+
+phiUg = linearInterpolate(Ug) & mesh.Sf();
+
 fvScalarMatrix alphagEqn
 (
     fvm::ddt(alphag)
-  + fvm::div(phi, alphag)
+  + fvm::div(phiUg, alphag)
   - diffusionFlag*Ct*fvm::laplacian(mixture.nuf(), alphag)
         ==
     alphagSource

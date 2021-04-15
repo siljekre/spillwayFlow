@@ -159,6 +159,64 @@ dimensionedScalar sigma
     transportProperties
 );
 
+volVectorField Ug
+(
+    IOobject
+    (
+        "Ug",
+        runTime.timeName(),
+        mesh,
+        IOobject::READ_IF_PRESENT,
+        IOobject::NO_WRITE
+    ),
+    U
+);
+Ug.write();
+
+volVectorField Ur
+(
+    IOobject
+    (
+        "Ur",
+        runTime.timeName(),
+        mesh,
+        IOobject::READ_IF_PRESENT,
+        IOobject::AUTO_WRITE
+    ),
+    (Ug - U)
+);
+Ur.write();
+
+// *** Variables stored for ddt and div
+
+surfaceScalarField phiUg
+(
+    IOobject
+    (
+        "phiUg",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    linearInterpolate(Ug) & mesh.Sf()
+);
+
+volScalarField ws
+(
+IOobject
+   (
+        "ws",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+   ),
+   mesh,
+   dimensionedScalar("ws",dimensionSet(0,0,0,0,0,0,0),1.0)
+);
+
+
 // Estimate of the mesh length scale
 DimensionedField<scalar, volMesh> cellSize 
 (
@@ -200,3 +258,7 @@ else
 }
 
 dimensionedScalar averageCellSize("averageCellSize", cellSize.average());
+
+
+
+

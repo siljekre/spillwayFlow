@@ -66,3 +66,22 @@ else
 {
     Info<< "    kCritical\t\t\t" << kCritical.value() << endl;
 }
+
+// *** Sets the model that will be used to calculate the velocity of the dispersed air phase
+
+Info << "Reading Momentum Options\n" << endl;
+
+const word momentumType (airModelProperties.lookup("momentumType"));
+
+Info << "Selecting bubble velocity calculation as: " << momentumType << "\n" << endl;
+
+dictionary slipModelType = airModelProperties.subDict("slipModelType");
+const word M_s (slipModelType.lookup("M_s"));
+
+if (momentumType == "slipModel")
+{
+    Info << "Selecting slip model as " << M_s << "\n" << endl;
+}
+
+// *** Bubble radius -> r_b [m]
+dimensionedScalar r_b (airModelProperties.lookup("r_b"));
