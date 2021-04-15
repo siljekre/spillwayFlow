@@ -32,7 +32,7 @@ forAll(mesh.boundary(), patchi)
 {
     // Info << "mesh.boundary()[patchi].type()=" << mesh.boundary()[patchi].type() << endl;
     // Info << "mesh.boundary()[patchi].name()=" << mesh.boundary()[patchi].name() << endl;
-    if(mesh.boundary()[patchi].type()=="wall"){
+    if(mesh.boundary()[patchi].name()=="atmosphere"){
 	mypatch = patchi;
     	Info << "Found our patch: " << mesh.boundary()[patchi].type() << ", " <<
 	    mesh.boundary()[patchi].name() << ", index=" << mypatch << endl;
@@ -119,7 +119,7 @@ forAll(patch, patchFaceI)
 	// Info << "nextCellIndex = " << nextCellIndex  << endl;
 	// Info << "alpha1 " << alpha1[nextCellIndex] << " layer " << layer << endl;
 
-	if(alpha1[nextCellIndex] <= 0.9)
+	if(alpha1[nextCellIndex] >= 0.1)
         {
 	    // indexList[patchFaceI] = nextCellIndex;
 	    indexList.append(nextCellIndex);
