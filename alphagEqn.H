@@ -32,7 +32,7 @@ forAll(mesh.boundary(), patchi)
 {
     // Info << "mesh.boundary()[patchi].type()=" << mesh.boundary()[patchi].type() << endl;
     // Info << "mesh.boundary()[patchi].name()=" << mesh.boundary()[patchi].name() << endl;
-    if(mesh.boundary()[patchi].name()=="atmosphere"){
+    if(mesh.boundary()[patchi].type()=="wall"){
 	mypatch = patchi;
     	Info << "Found our patch: " << mesh.boundary()[patchi].type() << ", " <<
 	    mesh.boundary()[patchi].name() << ", index=" << mypatch << endl;
@@ -82,20 +82,41 @@ label counter = 1;
 
 forAll(patch, patchFaceI)
 {
-    // Info << "patchFaceI=" << patchFaceI << endl;
+    // Info << "patchFaceI=" << faceNormals[patchFaceI] << endl;
+    // Info << "g=" << g.value() << endl;
+
+    // Only crawl in vertical direction
+    label crawlingDir = -1;
+    forAll(g.value(),i)
+    {
+	// Info << "i=" << g.value()[i] << endl;
+	if(g.value()[i] < 0)
+	    crawlingDir = i;
+    }
+
+    if(faceNormals[patchFaceI][crawlingDir] >= 0)
+    {
+	// Info << "Do only crawl in vertical direction " <<
+	//     faceNormals[patchFaceI] << endl;
+	continue;
+    }
 
     point patchFaceCenterI = patchFaceCentres[patchFaceI];
     label startCellIndex = faceCells[patchFaceI];
     cell startCell = cells[startCellIndex];
     label startFaceLabel = patchStart + patchFaceI;
     label nextCellIndex = -1;
-
+    label fsCellIndex = -1;
+    
     // Info << "alpha1 " << startCellIndex << endl;
     // Info << "alpha1 " << alpha1[startCellIndex] << endl;
 
+    bool flag = 0;
+    
     // Monday: Start step by step on my own, perhaps start by one layer and
     // print out to get control, should also start easy and make my own code
     // based on Tims code, and not copying the whole thing
+    scalar distanceFS = -1;
     for (label layer=0; layer < nLayers-1; layer++)
     {
 	label opposingFace = startCell.opposingFaceLabel(startFaceLabel, faces);
@@ -119,14 +140,31 @@ forAll(patch, patchFaceI)
 	// Info << "nextCellIndex = " << nextCellIndex  << endl;
 	// Info << "alpha1 " << alpha1[nextCellIndex] << " layer " << layer << endl;
 
-	if(alpha1[nextCellIndex] >= 0.1)
+	if(alpha1[nextCellIndex] <= (1-hi.value()) && flag==0)
         {
+	    // Here one should go down again
 	    // indexList[patchFaceI] = nextCellIndex;
-	    indexList.append(nextCellIndex);
+	    fsCellIndex = nextCellIndex;
+	    distanceFS = distance;
 	    // Info << nextCellIndex << " Distance " << distance << " layer " << layer << endl; 
 	    // Info << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
 	    // Info << indexList.size() << " " << patch.size()  << endl;
-	    break;
+	    flag = 1;
+	    // break;
+	}
+
+	if(alpha1[nextCellIndex] <= 0.0001)
+	{
+	    if(distanceFS > distFrac.value()*distance)
+	    {
+		indexList.append(fsCellIndex);
+		// Info << " Distance " << distance << ", distanceFS " << distanceFS << endl;
+		break;
+	    }else
+	    {
+		// Info << " Trying to enforce air into a step " << endl;
+		break;
+	    }
 	}
 
 
@@ -245,8 +283,25 @@ volVectorField nHat(gradAlpha1/(mag(gradAlpha1) + mixture.deltaN()));
 UnHat = U & nHat;
 dUdn = Foam::posPart(fvc::grad(UnHat) & nHat);
 
+forAll(dUdn,i)
+{
+    dUdn[i]=dudn.value();
+    if(mesh.C()[i][0] < 0.3){
+	// Info << "cellCentres[i]" << mesh.C()[i] << endl;
+	deltaFreeSurface[i] = 0;
+    }
+    // if(alpha1[i]<0.4)
+    // 	deltaFreeSurface[i] = 0;
+}
+
+// forAll(deltaFreeSurface, cellI)
+// {
+//     if(deltaFreeSurface[cellI] > 0 && dUdn[cellI] > 0)
+// 	Info << deltaFreeSurface[cellI] << " " << dUdn[cellI] << " " << mesh.C()[cellI] <<  endl;
+// }
+
 // Compute the surface roughness
-volScalarField a = 0.5*Foam::pow(0.09, 0.75)
+a = 0.5*Foam::pow(0.09, 0.75)
                    *Foam::pow(turbulence->k(), 1.5)
                    /turbulence->epsilon();
 
@@ -256,18 +311,20 @@ alphagSource = a / phiEnt * dUdn * deltaFreeSurface;
 // Bound the source term in space using appropriate criteria
 alphagSource *= pos(1.0 - alphag);
 alphagSource *= pos(alpha1 - 0.1);
-alphagSource *= pos(UnHat);
+//alphagSource *= pos(UnHat);
 
-if (kCritical.value() > 0)
-{
-    alphagSource *= pos(turbulence->k() - kCritical);
-}
-else
-{
-    Pt = turbulence->k()*rho;
-    Pd = rho*mag(g & nHat)*a + sigma/a;  
-    alphagSource *= pos(Pt - Pd);
-}
+
+// Info << "kCritical" << kCritical << endl;
+// if (kCritical.value() > 0)
+// {
+//     alphagSource *= pos(turbulence->k() - kCritical);
+// }
+// else
+// {
+//     Pt = turbulence->k()*rho;
+//     Pd = rho*mag(g & nHat)*a + sigma/a;  
+//     alphagSource *= pos(Pt - Pd);
+// }
 
 Info<< "Air entrainment source: "
     << "  Min(alphagSource) = " << min(alphagSource).value()
@@ -304,7 +361,7 @@ phiUg = linearInterpolate(Ug) & mesh.Sf();
 fvScalarMatrix alphagEqn
 (
     fvm::ddt(alphag)
-  + fvm::div(phiUg, alphag)
+  + fvm::div(phi, alphag)
   - diffusionFlag*Ct*fvm::laplacian(mixture.nuf(), alphag)
         ==
     alphagSource

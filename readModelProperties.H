@@ -51,6 +51,29 @@ dimensionedScalar bba
     airModelProperties.lookupOrDefault("BBA", false)
 );
 
+// Help variables when trying to develop the model
+dimensionedScalar hi
+(
+    "hi",
+    dimLength,
+    airModelProperties
+);
+
+dimensionedScalar dudn
+(
+    "dudn",
+    dimVelocity/dimLength,
+    airModelProperties
+);
+
+dimensionedScalar distFrac
+(
+    "distFrac",
+    dimless,
+    airModelProperties
+);
+
+
 Info<< "Air entrainment model parameters" << endl;
 Info<< "    phiEnt\t\t\t" << phiEnt.value() << endl;
 Info<< "    Diffusion term active?\t" << diffusionFlag.value() << endl;
