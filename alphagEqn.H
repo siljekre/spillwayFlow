@@ -60,25 +60,15 @@ const polyBoundaryMesh & boundaryMesh = mesh.boundaryMesh();
 
 //labelList indexList(patch.size());
 DynamicList<label> indexList;
+DynamicList<scalar> fractionDeltafs;
 
 //indexList[0]=1;
 
-// Ok, then I have one single patch which is the wall patch, which I want to go
-// through - goes through all these patches to find the h_90 surface on each of
-// them
-
-// Info << "patch.size()=" << patch.size() << " " << std::round(patch.size()) << endl;
-
-
-// Info << "alpha1.boundaryField()[mypatch][0] " << alpha1.boundaryField()[mypatch][0] << endl; 
 
 label nLayers = 200;
 
-
-// Info << "faceCells[0]=" << faceCells[0] << " " << faces[4]  << endl;
-// Info << "mesh.nInternalFaces() " << mesh.nInternalFaces() << endl;
-
 label counter = 1;
+
 
 forAll(patch, patchFaceI)
 {
@@ -113,9 +103,7 @@ forAll(patch, patchFaceI)
 
     bool flag = 0;
     
-    // Monday: Start step by step on my own, perhaps start by one layer and
-    // print out to get control, should also start easy and make my own code
-    // based on Tims code, and not copying the whole thing
+
     scalar distanceFS = -1;
     for (label layer=0; layer < nLayers-1; layer++)
     {
@@ -135,12 +123,7 @@ forAll(patch, patchFaceI)
 	}
         
 	    
-	// // Info << "distance = " << opposingFace  << endl;
-	// Info << "startCellIndex = " << owner[startFaceLabel]  << endl;
-	// Info << "nextCellIndex = " << nextCellIndex  << endl;
-	// Info << "alpha1 " << alpha1[nextCellIndex] << " layer " << layer << endl;
-
-	if(alpha1[nextCellIndex] <= (1-hi.value()) && flag==0)
+	if(alpha1[nextCellIndex] <= 0.0001)
         {
 	    // Here one should go down again
 	    // indexList[patchFaceI] = nextCellIndex;
@@ -153,67 +136,119 @@ forAll(patch, patchFaceI)
 	    // break;
 	}
 
-	if(alpha1[nextCellIndex] <= 0.0001)
-	{
-	    if(distanceFS > distFrac.value()*distance)
-	    {
-		indexList.append(fsCellIndex);
-		// Info << " Distance " << distance << ", distanceFS " << distanceFS << endl;
-		break;
-	    }else
-	    {
-		// Info << " Trying to enforce air into a step " << endl;
-		break;
-	    }
-	}
-
-
 	// Info << "layer " << layer << endl;
 	if(layer==nLayers-2)
 	{
 	    Info << "????????????????????" << " - find out what is wrong!" << endl;
 	}
+
+	if(flag){
+	    // indexList.append(fsCellIndex);
+	    startFaceLabel = opposingFace;
+	    //startCellIndex = nextCellIndex;
+	    // startCell = cells[startCellIndex];
+	    break;
+	}
 	
 	startFaceLabel = opposingFace;
 	startCellIndex = nextCellIndex;
 	startCell = cells[startCellIndex];
-	
+
     }
+
+    // Starting a new crawling loop, starting from h100, and crawling down until
+    // we reach h90 - so make that as the first next step
+    // scalar distanceFS = -1;
+
+    bool h90flag = 0;
+    label startCellh100 = startFaceLabel; //startCellIndex;
+    
+	
+    for (label layer=0; layer < nLayers-1; layer++)
+    {
+    	label opposingFace = startCell.opposingFaceLabel(startFaceLabel, faces);
+    	scalar distance =
+                mag(faceCentres[startCellh100] - faceCentres[opposingFace]);
+
+    	if (owner[opposingFace] == startCellIndex)
+        {
+    	    nextCellIndex = neighbour[opposingFace];
+    	}
+    	else
+        {
+    	    nextCellIndex = owner[opposingFace];
+    	    // Info << "heihei" << endl;
+    	}
+
+    	if(alpha1[nextCellIndex] >= 0.1) // find h90
+        {
+	    if(h90flag)
+	    {
+		// Info << "heiheiheihei" << endl;
+		scalar dfs = -1/phiEnt.value()*distance + 1;
+		// Info << "dfs: " << dfs  << " distance " << distance <<
+		//     " 1/phiEnt.value()*distance " <<  distance/phiEnt.value() <<  endl;
+		if(dfs > 1e-5){ // ): distance < phiEnt.value() 
+		    fractionDeltafs.append(dfs);
+		    indexList.append(nextCellIndex);
+		}else
+		    break;
+		// Info << "distance from h100: " << distance << " " << faceCentres[startCellh100] <<  " " << faceCentres[opposingFace] << endl; 
+	    }else
+	    {
+		// Info << "ID: " << nextCellIndex  << endl;
+		// Info << "distance from h100: " << distance << " " << faceCentres[startCellh100] <<  " " << faceCentres[opposingFace] << endl; 
+		//Info << "heiheiheihei" << endl;
+		fsCellIndex = nextCellIndex;
+		indexList.append(fsCellIndex);
+		fractionDeltafs.append(1);
+		h90flag = 1;
+	    }
+    	    //distanceFS = distance;
+    	    // Info << nextCellIndex << " Distance " << distance << " layer " << layer << endl; 
+    	    // Info << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
+    	    // Info << indexList.size() << " " << patch.size()  << endl;
+    	    //break;
+	    // if(distance > phiEnt.value()){ //0.01){ //alpha1[nextCellIndex] > 0.5)
+	    // 	// Info << "heiheiheihei" << endl;
+	    // 	break;
+	    // }
+    	}
+	startFaceLabel = opposingFace;
+	startCellIndex = nextCellIndex;
+	startCell = cells[startCellIndex];
+
+    }
+    
     // Info << "indexList " << indexList << endl;
     counter++;
-    // if(counter>220)
+    // if(counter>10)
     // 	break;
 
 }
-
-// // Info << indexList << endl;
-// forAll(indexList, indx)
-// {
-//     // // Info << "indx " << indx << endl;
-//     // Info << "alpha1[" << indexList[indx] << "] =" << alpha1[indexList[indx]] <<
-//     // 	" deltafs: " << deltaFreeSurface[indexList[indx]] << " indexList[indx] "
-//     // 	 << indexList[indx] << endl;
-//     deltaFreeSurface[indexList[indx]] = 1;
-// }
-
-// Info << deltaFreeSurface.size() << endl;
 
 
 forAll(deltaFreeSurface, i)
 {
     bool flag = 0;
 // Info << indexList << endl;
+    scalar myIndx = -1;
     forAll(indexList, indx)
     {
-	if(i==indexList[indx])
+	if(i==indexList[indx]){
 	    flag = 1;
+	    myIndx = indx;
+	}
     }
 
-    if(flag)
-	deltaFreeSurface[i] = 1;
+    if(flag){
+	deltaFreeSurface[i] = 1*fractionDeltafs[myIndx];
+    }
     else
 	deltaFreeSurface[i] = 0;
 }
+
+
 
 
 // deltaFreeSurface = 
@@ -285,20 +320,12 @@ dUdn = Foam::posPart(fvc::grad(UnHat) & nHat);
 
 forAll(dUdn,i)
 {
-    dUdn[i]=dudn.value();
-    if(mesh.C()[i][0] < 0.3){
+    if(mesh.C()[i][0] < 0.4){
 	// Info << "cellCentres[i]" << mesh.C()[i] << endl;
 	deltaFreeSurface[i] = 0;
     }
-    // if(alpha1[i]<0.4)
-    // 	deltaFreeSurface[i] = 0;
 }
 
-// forAll(deltaFreeSurface, cellI)
-// {
-//     if(deltaFreeSurface[cellI] > 0 && dUdn[cellI] > 0)
-// 	Info << deltaFreeSurface[cellI] << " " << dUdn[cellI] << " " << mesh.C()[cellI] <<  endl;
-// }
 
 // Compute the surface roughness
 a = 0.5*Foam::pow(0.09, 0.75)
@@ -311,7 +338,7 @@ alphagSource = a / phiEnt * dUdn * deltaFreeSurface;
 // Bound the source term in space using appropriate criteria
 alphagSource *= pos(1.0 - alphag);
 alphagSource *= pos(alpha1 - 0.1);
-//alphagSource *= pos(UnHat);
+alphagSource *= pos(UnHat);
 
 
 // Info << "kCritical" << kCritical << endl;
@@ -346,7 +373,7 @@ if (momentumType == "slipModel")
 else if (momentumType == "off")
 {
     Ug = U;
- }
+}
 
 // *** Print the velocity values
 Info << "Velocities: "
