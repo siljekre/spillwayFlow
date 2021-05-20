@@ -185,7 +185,7 @@ forAll(patch, patchFaceI)
 	    if(h90flag)
 	    {
 		// Info << "heiheiheihei" << endl;
-		scalar dfs = -1/phiEnt.value()*distance + 1;
+		scalar dfs = -1/interfaceThickness.value()*distance + 1; // interfaceThickness
 		// Info << "dfs: " << dfs  << " distance " << distance <<
 		//     " 1/phiEnt.value()*distance " <<  distance/phiEnt.value() <<  endl;
 		if(dfs > 1e-5){ // ): distance < phiEnt.value() 
@@ -320,7 +320,7 @@ dUdn = Foam::posPart(fvc::grad(UnHat) & nHat);
 
 forAll(dUdn,i)
 {
-    if(mesh.C()[i][0] < 0.4){
+    if(mesh.C()[i][0] < 0.7){
 	// Info << "cellCentres[i]" << mesh.C()[i] << endl;
 	deltaFreeSurface[i] = 0;
     }
@@ -335,9 +335,11 @@ a = 0.5*Foam::pow(0.09, 0.75)
 // Compute the source term for the alphag equation
 alphagSource = a / phiEnt * dUdn * deltaFreeSurface;
 
+scalar dbba = 0.05;
+
 // Bound the source term in space using appropriate criteria
 alphagSource *= pos(1.0 - alphag);
-alphagSource *= pos(alpha1 - 0.1);
+alphagSource *= pos(alpha1 - dbba);
 alphagSource *= pos(UnHat);
 
 
@@ -362,7 +364,7 @@ Info<< "Air entrainment source: "
 /*              ASSEMBLE AND SOLVE THE ALPHAG EQUATION                        */
 
 scalarField & penaltySourceField = penaltySource.primitiveFieldRef();
-penaltySourceField = -neg(alpha1 - 0.1)/runTime.deltaTValue();
+penaltySourceField = -neg(alpha1 - dbba)/runTime.deltaTValue();
 
 
 // *** Solve momentum equation for Ug
