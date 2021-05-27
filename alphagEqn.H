@@ -23,10 +23,6 @@ dimensionedScalar aParabola
 
 label mypatch(1000); 
 
-// Info << "mesh.boundaryMesh().patchID()=" << mesh.boundaryMesh().patchID()[2] << endl;
-// Info << "alpha1.boundaryField().size()=" << alpha1.boundaryField().size() << endl;
-// Info << "alpha1.boundaryField()[0].size()=" << alpha1.boundaryField()[0].size() << endl;
-// Info << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
 
 forAll(mesh.boundary(), patchi)
 {
@@ -197,22 +193,12 @@ forAll(patch, patchFaceI)
 	    }else
 	    {
 		// Info << "ID: " << nextCellIndex  << endl;
-		// Info << "distance from h100: " << distance << " " << faceCentres[startCellh100] <<  " " << faceCentres[opposingFace] << endl; 
-		//Info << "heiheiheihei" << endl;
+		// Info << "distance from h100: " << distance << " " << faceCentres[startCellh100] <<  " " << faceCentres[opposingFace] << endl;
 		fsCellIndex = nextCellIndex;
 		indexList.append(fsCellIndex);
 		fractionDeltafs.append(1);
 		h90flag = 1;
 	    }
-    	    //distanceFS = distance;
-    	    // Info << nextCellIndex << " Distance " << distance << " layer " << layer << endl; 
-    	    // Info << "++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
-    	    // Info << indexList.size() << " " << patch.size()  << endl;
-    	    //break;
-	    // if(distance > phiEnt.value()){ //0.01){ //alpha1[nextCellIndex] > 0.5)
-	    // 	// Info << "heiheiheihei" << endl;
-	    // 	break;
-	    // }
     	}
 	startFaceLabel = opposingFace;
 	startCellIndex = nextCellIndex;
@@ -320,7 +306,7 @@ dUdn = Foam::posPart(fvc::grad(UnHat) & nHat);
 
 forAll(dUdn,i)
 {
-    if(mesh.C()[i][0] < 0.7){
+    if(mesh.C()[i][0] < 0.5){
 	// Info << "cellCentres[i]" << mesh.C()[i] << endl;
 	deltaFreeSurface[i] = 0;
     }
@@ -335,7 +321,7 @@ a = 0.5*Foam::pow(0.09, 0.75)
 // Compute the source term for the alphag equation
 alphagSource = a / phiEnt * dUdn * deltaFreeSurface;
 
-scalar dbba = 0.05;
+scalar dbba = 0.1;
 
 // Bound the source term in space using appropriate criteria
 alphagSource *= pos(1.0 - alphag);
